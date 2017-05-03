@@ -1800,6 +1800,7 @@ static void parse_time(void) {
 /* ------------- */
 static void parse_bcis_command(void) {
   switch (command_buffer[2] & 0x1f) {
+  /* CMD 1 - READ */
   case 0:
   case 0x10: /* Burst Read Sector(s) ($8371)
      02 T E B S 0 0 0   N
@@ -1829,6 +1830,7 @@ static void parse_bcis_command(void) {
       s_out_burstload(command_buffer[5]);
     }
     break;
+  /*CMD 2 - WRITE */
   case 0x2:
   case 0x12: /* Burst Write Sector(s) ($83EC)
      02 T E B S 0 0 1   N
@@ -1851,6 +1853,7 @@ static void parse_bcis_command(void) {
       s_in_burstload(command_buffer[5]);
     }
     break;
+  /* CMD 3 - INQUIRE DISK */
   case 0x4:
   case 0x14: /* Burst Inquire Disk ($848B)
      02 X X X S 0 1 0   N
@@ -1875,6 +1878,7 @@ static void parse_bcis_command(void) {
     }
     b_out_burstload(0, bcis_status); /* send status only */
     break;
+  /* CMD 4 - FORMAT (MFM or GCR for 1571)*/  
   case 0x6:
   case 0x16: /* Burst Format ($84B7)
      02 P I D S 0 1 1   N
@@ -1900,6 +1904,7 @@ static void parse_bcis_command(void) {
     set_error(ERROR_SYNTAX_UNABLE);
     b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* status = syntax error */
     break;
+  /* CMD 5 - SECTOR INTERLEAVE (1571 only) */
   case 0x8: /* Sector Interleave ($84f1)
      02 W X X 0 1 0 0   N
      03 -------  INTERLEAVE ---------
@@ -1916,6 +1921,7 @@ static void parse_bcis_command(void) {
         bcis_interleave = command_buffer[3]; /* no value test! ($8511) */
     }
     break;
+  /* CMD 6 - QUERY DISK FORMAT */
   case 0xa:
   case 0x1a: {/* Query Disk Format ($8517)
      02 F X T S 1 0 1   N
@@ -2022,6 +2028,7 @@ static void parse_bcis_command(void) {
     set_error(ERROR_OK);
     break;
   }
+  /* CMD 7 - INQUIRE STATUS */
   case 0xc: /* Inquire Status ($856b)
          02 W C X 0 1 1 0   N
      03   -- NEW STATUS (W-BIT SET) ---
@@ -2050,10 +2057,16 @@ static void parse_bcis_command(void) {
         bcis_status = command_buffer[3];
     }
     break;
+  /* CMD 8 - DUMP TRACK CACHE BUFFER (1581 only)*/
+  case 0x1d:
+    set_error(ERROR_SYNTAX_UNKNOWN);
+    break;
+  /* ? */
   case 0x0e: /* Duplicate Disk ($85a5) */
     b_out_burstload(0, (bcis_status & 0xf0) | 0x0e); /* status = syntax error */
     set_error(ERROR_SYNTAX_UNKNOWN);
     break;
+  /* CHGUTL UTILITY */
   case 0x1e: /* Change Utility ($8FE5) */
     if (command_length <4) {
       set_error(ERROR_SYNTAX_UNABLE);
@@ -2085,6 +2098,7 @@ static void parse_bcis_command(void) {
       }
     }
     break;
+  /* FASTLOAD UTILITY */
   case 0x1f: /* Burst Load File ($9080)
      02 P X X 1 1 1 1 1
      03+  FILE NAME
