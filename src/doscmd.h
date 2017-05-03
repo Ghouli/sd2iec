@@ -32,6 +32,8 @@ extern date_t date_match_start;
 extern date_t date_match_end;
 
 extern uint16_t datacrc;
+extern uint8_t bcis_status;
+extern uint8_t bcis_interleave;
 
 void parse_doscommand(void);
 void do_chdir(uint8_t *parsestr);

@@ -1793,6 +1793,315 @@ static void parse_time(void) {
 #endif /* HAVE_RTC */
 
 
+/* ------------- */
+/*  U0 commands  */
+/* ------------- */
+static void parse_u0command(void) {
+  switch (command_buffer[2] & 0x1f) {
+  case 0:
+  case 0x10: /* Burst Read Sector(s) ($8371)
+     02 T E B S 0 0 0   N
+     03   DESTINATION TRACK
+     04 DESTINATION SECTOR
+     05 NUMBER OF SECTORS
+     06 NEXT TRACK (OPTIONAL)
+    T - TRANSFER DATA (1=NO TRANSFER)
+    E - IGNORE ERROR (1=IGNORE)
+    B - BUFFER TRANSFER ONLY (1=BUFFER TRANSFER ONLY)
+    S - SIDE SELECT (MFM ONLY)
+    N - DRIVE NUMBER */
+  /* We only get here if N (drive#) = 0
+    Ignore T (no transfer) until buffer open ('#0') is fixed
+    Ignore B (transfer only) until buffer open ('#0') is fixed
+    Ignore E ... FIXME
+    Ignore S until MFM disk images supported ... FIXME .D81 ??
+    Ignore 06 (next track) because we do not have a head to move
+  */
+  if (command_length < 6) {
+    /* FIXME ? 1571 doesn't check, we do */
+    b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
+      set_error(ERROR_SYNTAX_UNABLE);
+  } else {
+    fl_track = command_buffer[3];
+    fl_sector = command_buffer[4];
+    s_out_burstload(command_buffer[5]);
+  }
+      break;
+  case 0x2:
+  case 0x12: /* Burst Write Sector(s) ($83EC)
+     02 T E B S 0 0 1   N
+     03 DESTINATION TRACK
+     04 DESTINATION SECTOR
+     05 NUMBER OF SECTORS
+     06 NEXT TRACK (OPTIONAL)
+    T - TRANSFER DATA (1=NO TRANSFER)
+    E - IGNORE ERROR (1=IGNORE)
+    B - BUFFER TRANSFER ONLY (1=BUFFER TRANSFER ONLY)
+    S - SIDE SELECT (MFM ONLY)
+    N - DRIVE NUMBER */
+  if (command_length < 6) {
+    /* FIXME ? 1571 doesn't check, we do */
+    b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
+      set_error(ERROR_SYNTAX_UNABLE);
+  } else {
+    fl_track = command_buffer[3];
+    fl_sector = command_buffer[4];
+    s_in_burstload(command_buffer[5]);
+  }
+  break;
+  case 0x4:
+  case 0x14: /* Burst Inquire Disk ($848B)
+     02 X X X S 0 1 0   N
+    S - SIDE SELECT (MFM ONLY)
+    N - DRIVE NUMBER 
+    X - DON'T CARE */
+    switch (partition[current_part].imagetype & D64_TYPE_MASK) {
+    /* this assumes a readable card is in the device! */
+    /* FIXME: 512 sectors for FAT and D81 */
+  case D64_TYPE_D41:
+  case D64_TYPE_D71:
+      bcis_status = 0x01; /* okay, native CBM disk (implied sector size 256) */
+    break;
+  case D64_TYPE_D81:      /* FIXME */
+      bcis_status = 0x2F; /* error, native CBM disk + 512 sector size */
+    break;
+  case D64_TYPE_NONE:     /* FAT - FIXME */
+      bcis_status = 0xAF; /* error, foreign disk + 512 sector size */
+    break;
+  default:                /* DNP, M2I ... FIXME */
+      bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
+  }
+    b_out_burstload(0, bcis_status); /* send status only */
+    break;
+  case 0x6:
+  case 0x16: /* Burst Format ($84B7)
+     02 P I D S 0 1 1   N
+     03   M   T   LOGICAL STARTING SECTOR
+     04 -INTERLEAVE (OPTIONAL DEF-0)-
+     05   SECTOR SIZE  * (OPTIONAL 01 for 256 Byte Sectors)
+     06   LAST TRACK NUMBER      (OPTIONAL DEF-39)
+     07   NUMBER OF SECTORS      (OPTIONAL DEPENDS ON BYTE 05)
+     08 LOGICAL STARTING TRACK (OPTIONAL DEF-0)
+     09   STARTING TRACK OFFSET  (OPTIONAL DEF-0)
+     0A   FILL BYTE              (OPTIONAL DEF-$E5)
+     0B-?? SECTOR TABLE          (OPTIONAL T-BIT SET)
+      M - MFM (not CBM)
+    P - PARTIAL FORMAT (1=PARTIAL)
+    I - INDEX ADDRESS MARK WRITTEN (1=WRITTEN)
+    D - DOUBLE SIDED FLAG (1=FORMAT DOUBLE SIDED)
+    S - SIDE SELECT 
+    T - SECTOR TABLE INCLUDED (ALL OTHER PARMS MUST BE INCLUDED)
+    N - DRIVE NUMBER
+     Notes: If M=0 then remainder of 03 is ignored
+            and byte 04,05 = Disk ID
+            and all other parameters ignored. */
+      set_error(ERROR_SYNTAX_UNABLE);
+      b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* status = syntax error */
+      break;
+  case 0x8: /* Sector Interleave ($84f1)
+     02 W X X 0 1 0 0   N
+     03 -------  INTERLEAVE ---------
+    W - WRITE SWITCH
+    N - DRIVE NUMBER
+    X - DON'T CARE */
+  /* 'W' actualy means Read (not Write) ... silly CBM */
+  if (command_buffer[2] & 0x80) 
+        b_out_burstload(0, bcis_interleave); /* read value */
+  else { /* write sector interleave */
+    if (command_length < 4)
+          set_error(ERROR_SYNTAX_UNABLE);
+    else
+      bcis_interleave = command_buffer[3]; /* no value test! ($8511) */
+  }
+      break;
+  case 0xa:
+  case 0x1a: {/* Query Disk Format ($8517)
+     02 F X T S 1 0 1   N
+     03   -OFFSET (OPTIONAL F-BIT SET)-
+    F - FORCE FLAG (F=1, WILL STEP THE HEAD)
+    T - END SECTOR TABLE (T=1, SEND)
+    N - DRIVE NUMBER
+    X - DON'T CARE.
+      OUTPUT:
+        BURST STATUS BYTE (IF THERE WAS AN ERROR OR IF THE 
+       FORMAT IS GCR NO BYTES WILL FOLLOW)
+        BURST STATUS BYTE (IF THERE WAS AN ERROR IN COMPILING 
+           MFM FORMAT INFORMATION NO BYTES WILL FOLLOW)
+        NUMBER OF SECTORS (THE NUMBER OF SECTORS ON A PARTICULAR TRACK)
+        LOGICAL TRACK   (LOGICAL TRACK NUMBER FOUND IN THE DISK HEADER)
+        MINIMUM SECTOR    (THE LOGICAL SECTOR WITH THE LOWEST VALUE)
+        MAXIMUM SECTOR    (THE LOGICAL SECTOR WITH THE HIGHEST VALUE)
+        CP/M INTERLEAVE   (THE HARD INTERLEAVE FOUND ON THE TRACK) */
+  uint8_t smin, smax;
+  buffer_t* buf;
+  uint8_t stop;  /* flag ATN found */
+  uint8_t flags = 1; /* current CLOCK value because of Unlisten */
+  buf = alloc_buffer();
+  if (!buf) {
+    b_out_burstload(flags ^= 1, (bcis_status & 0xf0) | 0xf); /* drive not ready */
+    break; /* end */
+  }
+      switch (partition[current_part].imagetype & D64_TYPE_MASK) {
+    /* this assumes a readable card is in the device! */
+    /* FIXME ... 1581 should return 'physical' 10 sectors/track */
+  case D64_TYPE_D41:
+  case D64_TYPE_D71:
+    bcis_status = 0x01; /* okay, native CBM disk (implied sector size 256) */
+    break;
+  case D64_TYPE_D81:
+    bcis_status = 0x20; /* okay, native CBM disk + 512 sector size */
+    break;
+  case D64_TYPE_NONE:   /* FAT */
+    bcis_status = 0xAF; /* error, foreign disk + 512 sector size */
+    break;
+  default:          /* DNP, M2I ... FIXME? */
+    bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
+  }
+  fl_track = 1;
+  if (command_buffer[2] & 0x80) { /* seek to track */
+    if (command_length < 4) {
+       /* silly user */
+      set_error(ERROR_SYNTAX_UNABLE);
+      bcis_status = (bcis_status & 0xf0) | 0x0e; /* syntax error */
+    } else if ((bcis_status & 0x0f) < 2) {
+      /* seek any sector of track, but only supported image types */
+      /* use sector 1 until we have 'seek' for fileops_t */
+      fl_track = 1 + command_buffer[3];
+      read_sector(buf, current_part, fl_track, 1);
+      if (current_error)
+        bcis_status = (bcis_status & 0xf0) | 2; /* sector not found */
+    }
+  }
+      stop = b_out_burstload(flags ^= 1, bcis_status); /* sector size, type, error status */
+  if (stop || bcis_status == 1 || (bcis_status & 0xf) > 1) {
+    free_buffer(buf);
+    break; /* found ATN or no further info */
+  }
+  /* the following is overkill until we support .GCR or .MFM images */
+  smin = 0 ;
+  current_error = 0; /* '00,OK' should be set, but just to be safe */
+  do {
+    read_sector(buf, current_part, fl_track, smin);
+    if (current_error == 0)
+      break;
+    ++smin;
+  } while (smin);
+  smax = smin + 1;
+  current_error = 0;
+  do {
+    read_sector(buf, current_part, fl_track, smax);
+    if (current_error != 0)
+      break;
+    ++smax;
+  } while (smax);
+  /* note smax is really max+1 */  do {/* send results, break if ATN found */
+    if (b_out_burstload(flags ^= 1, smax - smin)) /* # sectors */
+      break;
+    if (b_out_burstload(flags ^= 1, fl_track -1)) /* logical track -- FIXME ? */
+      break;
+    if (b_out_burstload(flags ^= 1, smin))        /* lowest sector# */
+      break;
+    if (b_out_burstload(flags ^= 1, smax - 1))    /* highest sector# */
+      break;
+    /* fake the sector interleave and sector table */
+    if (b_out_burstload(flags ^= 1, 1))           /* hard sector interleave */
+      break;
+    if (command_buffer[2] & 0x20) { 
+      /* send sector table */
+      do {
+        if (b_out_burstload(flags ^= 1, smin))
+          break; /* found ATN */
+        ++smin;
+      } while (smin != smax);
+    }
+  } while(0);
+  free_buffer(buf);
+  set_error(ERROR_OK);
+      break;
+}
+  case 0xc: /* Inquire Status ($856b)
+         02 W C X 0 1 1 0   N
+     03   -- NEW STATUS (W-BIT SET) ---
+    W - WRITE SWITCH
+    C - CHANGE (C=1 & W=0 - FORCE LOGIN DISK,
+      C=1 & W=1 - RETURN WHETHER DISK WAS LOGGED 
+      IE. $XB ERROR OR OLD STATUS)
+    N - DRIVE NUMBER
+    X - DON'T CARE  */
+  /* note the 'W' bit is really Read (not Write) ... silly CBM
+     also, 1571 does not check command length, we do
+     the 'C' bit is for disk change hardware flag, nothing for us
+     this is reported by code 0xb when disk is (un)mounted */
+  /*    if (!IEC_CLOCK) {
+    set_error(ERROR_BUS);
+    break;
+  }
+  */
+  if (command_buffer[2] & 0x80)  /* Read status */
+        b_out_burstload(0, bcis_status);
+  else { /* write status */
+    if (command_length < 4) {
+       /* silly user */
+      set_error(ERROR_SYNTAX_UNABLE);
+    } else /* FIXME ? changes sector size for 1571, but not us */
+      bcis_status = command_buffer[3];
+  }
+      break;
+case 0x0e: /* Duplicate Disk ($85a5) */
+      b_out_burstload(0, (bcis_status & 0xf0) | 0x0e); /* status = syntax error */
+      set_error(ERROR_SYNTAX_UNKNOWN);
+  break;
+  case 0x1e: /* Change Utility ($8FE5) */
+      if (command_length <4) {
+          set_error(ERROR_SYNTAX_UNABLE);
+    break;
+  }
+  switch(command_buffer[3]) {
+  case 'R':  /* retries */
+  case 'T':  /* test ROM */
+  case 'V':  /* disable verify */
+    break; /* okay -- ignore */
+  case 'H':  /* head select */
+  case 'M':  /* 1541/71 mode select */
+    set_error(ERROR_SYNTAX_UNABLE);
+    break;
+  case 'S':  /* sector interleave $8fa4 */
+    if (command_length <5)
+      set_error(ERROR_SYNTAX_UNABLE);
+    else
+      partition[current_part].d64data.file_interleave = command_buffer[4];
+      /* FIXME: the above gets reset on disk swap,
+      but it is stored ($69) seperate from bcis_interleave ($3c) */
+    break;
+  default:  /* device# */
+    if (command_buffer[3] >= 4 && command_buffer[3] <= 30) {
+      device_address = command_buffer[3];
+      display_address(device_address);
+    } else
+      set_error(ERROR_SYNTAX_UNABLE);
+  }
+      break;
+  case 0x1f: /* Burst Load File ($9080)
+     02 P X X 1 1 1 1 1
+     03+  FILE NAME
+  P - SEQUENTIAL FILE BIT (P=1, DOES NOT HAVE TO BE A PRG FILE)
+  X - DON'T CARE. */
+  /*    if (!IEC_CLOCK) {
+    set_error(ERROR_BUS);
+    break;
+  }
+  */    f_out_burstload();
+      break;
+  default:
+      if (command_buffer[1] & 1)
+          set_error(ERROR_DRIVE_NOT_READY);
+      else
+          set_error(ERROR_SYNTAX_UNKNOWN);
+      break; /* fall through */
+  }
+  break; /* End U0 Command */
+}
+
 /* ------------ */
 /*  U commands  */
 /* ------------ */
@@ -1859,14 +2168,17 @@ static void parse_user(void) {
     break;
 
   case '0':
-    /* U0 - only device address changes for now */
+    /* U0 Commands -- FIXME a seperate parser ?
+      all parameters quoted from 1571 source code "Fastutl.src" */
+    parse_u0command()
+    /*
     if ((command_buffer[2] & 0x1f) == 0x1e &&
         command_buffer[3] >= 4 &&
         command_buffer[3] <= 30) {
       device_address = command_buffer[3];
       display_address(device_address);
       break;
-    }
+    }*/
     /* Fall through */
 
   default:
@@ -1874,7 +2186,6 @@ static void parse_user(void) {
     break;
   }
 }
-
 
 /* ------------ */
 /*  X commands  */
