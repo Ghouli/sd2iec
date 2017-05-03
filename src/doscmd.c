@@ -1897,9 +1897,9 @@ static void parse_bcis_command(void) {
      Notes: If M=0 then remainder of 03 is ignored
             and byte 04,05 = Disk ID
             and all other parameters ignored. */
-      set_error(ERROR_SYNTAX_UNABLE);
-      b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* status = syntax error */
-      break;
+    set_error(ERROR_SYNTAX_UNABLE);
+    b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* status = syntax error */
+    break;
   case 0x8: /* Sector Interleave ($84f1)
      02 W X X 0 1 0 0   N
      03 -------  INTERLEAVE ---------
@@ -1907,15 +1907,15 @@ static void parse_bcis_command(void) {
     N - DRIVE NUMBER
     X - DON'T CARE */
     /* 'W' actualy means Read (not Write) ... silly CBM */
-    if (command_buffer[2] & 0x80) 
+    if (command_buffer[2] & 0x80) {
       b_out_burstload(0, bcis_interleave); /* read value */
-    else { /* write sector interleave */
+    } else { /* write sector interleave */
       if (command_length < 4)
         set_error(ERROR_SYNTAX_UNABLE);
       else
         bcis_interleave = command_buffer[3]; /* no value test! ($8511) */
     }
-      break;
+    break;
   case 0xa:
   case 0x1a: {/* Query Disk Format ($8517)
      02 F X T S 1 0 1   N
@@ -1934,93 +1934,94 @@ static void parse_bcis_command(void) {
         MINIMUM SECTOR    (THE LOGICAL SECTOR WITH THE LOWEST VALUE)
         MAXIMUM SECTOR    (THE LOGICAL SECTOR WITH THE HIGHEST VALUE)
         CP/M INTERLEAVE   (THE HARD INTERLEAVE FOUND ON THE TRACK) */
-  uint8_t smin, smax;
-  buffer_t* buf;
-  uint8_t stop;  /* flag ATN found */
-  uint8_t flags = 1; /* current CLOCK value because of Unlisten */
-  buf = alloc_buffer();
-  if (!buf) {
-    b_out_burstload(flags ^= 1, (bcis_status & 0xf0) | 0xf); /* drive not ready */
-    break; /* end */
-  }
-      switch (partition[current_part].imagetype & D64_TYPE_MASK) {
+    uint8_t smin, smax;
+    buffer_t* buf;
+    uint8_t stop;  /* flag ATN found */
+    uint8_t flags = 1; /* current CLOCK value because of Unlisten */
+    buf = alloc_buffer();
+    if (!buf) {
+      b_out_burstload(flags ^= 1, (bcis_status & 0xf0) | 0xf); /* drive not ready */
+      break; /* end */
+    }
+    switch (partition[current_part].imagetype & D64_TYPE_MASK) {
     /* this assumes a readable card is in the device! */
     /* FIXME ... 1581 should return 'physical' 10 sectors/track */
-  case D64_TYPE_D41:
-  case D64_TYPE_D71:
-    bcis_status = 0x01; /* okay, native CBM disk (implied sector size 256) */
-    break;
-  case D64_TYPE_D81:
-    bcis_status = 0x20; /* okay, native CBM disk + 512 sector size */
-    break;
-  case D64_TYPE_NONE:   /* FAT */
-    bcis_status = 0xAF; /* error, foreign disk + 512 sector size */
-    break;
-  default:          /* DNP, M2I ... FIXME? */
-    bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
-  }
-  fl_track = 1;
-  if (command_buffer[2] & 0x80) { /* seek to track */
-    if (command_length < 4) {
-       /* silly user */
-      set_error(ERROR_SYNTAX_UNABLE);
-      bcis_status = (bcis_status & 0xf0) | 0x0e; /* syntax error */
-    } else if ((bcis_status & 0x0f) < 2) {
-      /* seek any sector of track, but only supported image types */
-      /* use sector 1 until we have 'seek' for fileops_t */
-      fl_track = 1 + command_buffer[3];
-      read_sector(buf, current_part, fl_track, 1);
-      if (current_error)
-        bcis_status = (bcis_status & 0xf0) | 2; /* sector not found */
+    case D64_TYPE_D41:
+    case D64_TYPE_D71:
+      bcis_status = 0x01; /* okay, native CBM disk (implied sector size 256) */
+      break;
+    case D64_TYPE_D81:
+      bcis_status = 0x20; /* okay, native CBM disk + 512 sector size */
+      break;
+    case D64_TYPE_NONE:   /* FAT */
+      bcis_status = 0xAF; /* error, foreign disk + 512 sector size */
+      break;
+    default:          /* DNP, M2I ... FIXME? */
+      bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
     }
-  }
-      stop = b_out_burstload(flags ^= 1, bcis_status); /* sector size, type, error status */
-  if (stop || bcis_status == 1 || (bcis_status & 0xf) > 1) {
+    fl_track = 1;
+    if (command_buffer[2] & 0x80) { /* seek to track */
+      if (command_length < 4) {
+         /* silly user */
+        set_error(ERROR_SYNTAX_UNABLE);
+        bcis_status = (bcis_status & 0xf0) | 0x0e; /* syntax error */
+      } else if ((bcis_status & 0x0f) < 2) {
+        /* seek any sector of track, but only supported image types */
+        /* use sector 1 until we have 'seek' for fileops_t */
+        fl_track = 1 + command_buffer[3];
+        read_sector(buf, current_part, fl_track, 1);
+        if (current_error)
+          bcis_status = (bcis_status & 0xf0) | 2; /* sector not found */
+      }
+    }
+    stop = b_out_burstload(flags ^= 1, bcis_status); /* sector size, type, error status */
+    if (stop || bcis_status == 1 || (bcis_status & 0xf) > 1) {
+      free_buffer(buf);
+      break; /* found ATN or no further info */
+    }
+    /* the following is overkill until we support .GCR or .MFM images */
+    smin = 0 ;
+    current_error = 0; /* '00,OK' should be set, but just to be safe */
+    do {
+      read_sector(buf, current_part, fl_track, smin);
+      if (current_error == 0)
+        break;
+      ++smin;
+    } while (smin);
+    smax = smin + 1;
+    current_error = 0;
+    do {
+      read_sector(buf, current_part, fl_track, smax);
+      if (current_error != 0)
+        break;
+      ++smax;
+    } while (smax);
+    /* note smax is really max+1 */  
+    do {/* send results, break if ATN found */
+      if (b_out_burstload(flags ^= 1, smax - smin)) /* # sectors */
+        break;
+      if (b_out_burstload(flags ^= 1, fl_track -1)) /* logical track -- FIXME ? */
+        break;
+      if (b_out_burstload(flags ^= 1, smin))        /* lowest sector# */
+        break;
+      if (b_out_burstload(flags ^= 1, smax - 1))    /* highest sector# */
+        break;
+      /* fake the sector interleave and sector table */
+      if (b_out_burstload(flags ^= 1, 1))           /* hard sector interleave */
+        break;
+      if (command_buffer[2] & 0x20) { 
+        /* send sector table */
+        do {
+          if (b_out_burstload(flags ^= 1, smin))
+            break; /* found ATN */
+          ++smin;
+        } while (smin != smax);
+      }
+    } while(0);
     free_buffer(buf);
-    break; /* found ATN or no further info */
+    set_error(ERROR_OK);
+    break;
   }
-  /* the following is overkill until we support .GCR or .MFM images */
-  smin = 0 ;
-  current_error = 0; /* '00,OK' should be set, but just to be safe */
-  do {
-    read_sector(buf, current_part, fl_track, smin);
-    if (current_error == 0)
-      break;
-    ++smin;
-  } while (smin);
-  smax = smin + 1;
-  current_error = 0;
-  do {
-    read_sector(buf, current_part, fl_track, smax);
-    if (current_error != 0)
-      break;
-    ++smax;
-  } while (smax);
-  /* note smax is really max+1 */  do {/* send results, break if ATN found */
-    if (b_out_burstload(flags ^= 1, smax - smin)) /* # sectors */
-      break;
-    if (b_out_burstload(flags ^= 1, fl_track -1)) /* logical track -- FIXME ? */
-      break;
-    if (b_out_burstload(flags ^= 1, smin))        /* lowest sector# */
-      break;
-    if (b_out_burstload(flags ^= 1, smax - 1))    /* highest sector# */
-      break;
-    /* fake the sector interleave and sector table */
-    if (b_out_burstload(flags ^= 1, 1))           /* hard sector interleave */
-      break;
-    if (command_buffer[2] & 0x20) { 
-      /* send sector table */
-      do {
-        if (b_out_burstload(flags ^= 1, smin))
-          break; /* found ATN */
-        ++smin;
-      } while (smin != smax);
-    }
-  } while(0);
-  free_buffer(buf);
-  set_error(ERROR_OK);
-      break;
-}
   case 0xc: /* Inquire Status ($856b)
          02 W C X 0 1 1 0   N
      03   -- NEW STATUS (W-BIT SET) ---
@@ -2039,50 +2040,51 @@ static void parse_bcis_command(void) {
     break;
   }
   */
-  if (command_buffer[2] & 0x80)  /* Read status */
-        b_out_burstload(0, bcis_status);
-  else { /* write status */
-    if (command_length < 4) {
-       /* silly user */
-      set_error(ERROR_SYNTAX_UNABLE);
-    } else /* FIXME ? changes sector size for 1571, but not us */
-      bcis_status = command_buffer[3];
-  }
-      break;
-case 0x0e: /* Duplicate Disk ($85a5) */
-      b_out_burstload(0, (bcis_status & 0xf0) | 0x0e); /* status = syntax error */
-      set_error(ERROR_SYNTAX_UNKNOWN);
-  break;
+    if (command_buffer[2] & 0x80)  /* Read status */
+      b_out_burstload(0, bcis_status);
+    else { /* write status */
+      if (command_length < 4) {
+         /* silly user */
+        set_error(ERROR_SYNTAX_UNABLE);
+      } else /* FIXME ? changes sector size for 1571, but not us */
+        bcis_status = command_buffer[3];
+    }
+    break;
+  case 0x0e: /* Duplicate Disk ($85a5) */
+    b_out_burstload(0, (bcis_status & 0xf0) | 0x0e); /* status = syntax error */
+    set_error(ERROR_SYNTAX_UNKNOWN);
+    break;
   case 0x1e: /* Change Utility ($8FE5) */
-      if (command_length <4) {
-          set_error(ERROR_SYNTAX_UNABLE);
-    break;
-  }
-  switch(command_buffer[3]) {
-  case 'R':  /* retries */
-  case 'T':  /* test ROM */
-  case 'V':  /* disable verify */
-    break; /* okay -- ignore */
-  case 'H':  /* head select */
-  case 'M':  /* 1541/71 mode select */
-    set_error(ERROR_SYNTAX_UNABLE);
-    break;
-  case 'S':  /* sector interleave $8fa4 */
-    if (command_length <5)
+    if (command_length <4) {
       set_error(ERROR_SYNTAX_UNABLE);
-    else
-      partition[current_part].d64data.file_interleave = command_buffer[4];
-      /* FIXME: the above gets reset on disk swap,
-      but it is stored ($69) seperate from bcis_interleave ($3c) */
-    break;
-  default:  /* device# */
-    if (command_buffer[3] >= 4 && command_buffer[3] <= 30) {
-      device_address = command_buffer[3];
-      display_address(device_address);
-    } else
-      set_error(ERROR_SYNTAX_UNABLE);
-  }
       break;
+    }
+    switch(command_buffer[3]) {
+    case 'R':  /* retries */
+    case 'T':  /* test ROM */
+    case 'V':  /* disable verify */
+      break; /* okay -- ignore */
+    case 'H':  /* head select */
+    case 'M':  /* 1541/71 mode select */
+      set_error(ERROR_SYNTAX_UNABLE);
+      break;
+    case 'S':  /* sector interleave $8fa4 */
+      if (command_length <5)
+        set_error(ERROR_SYNTAX_UNABLE);
+      else
+        partition[current_part].d64data.file_interleave = command_buffer[4];
+        /* FIXME: the above gets reset on disk swap,
+        but it is stored ($69) seperate from bcis_interleave ($3c) */
+      break;
+    default:  /* device# */
+      if (command_buffer[3] >= 4 && command_buffer[3] <= 30) {
+        device_address = command_buffer[3];
+        display_address(device_address);
+      } else {
+        set_error(ERROR_SYNTAX_UNABLE);
+      }
+    }
+    break;
   case 0x1f: /* Burst Load File ($9080)
      02 P X X 1 1 1 1 1
      03+  FILE NAME
@@ -2092,14 +2094,15 @@ case 0x0e: /* Duplicate Disk ($85a5) */
     set_error(ERROR_BUS);
     break;
   }
-  */    f_out_burstload();
-      break;
+  */
+    f_out_burstload();
+    break;
   default:
-      if (command_buffer[1] & 1)
-          set_error(ERROR_DRIVE_NOT_READY);
-      else
-          set_error(ERROR_SYNTAX_UNKNOWN);
-      break; /* fall through */
+    if (command_buffer[1] & 1)
+      set_error(ERROR_DRIVE_NOT_READY);
+    else
+      set_error(ERROR_SYNTAX_UNKNOWN);
+    break; /* fall through */
   }
   /* End U0 Command */
 }
