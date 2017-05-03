@@ -1798,7 +1798,7 @@ static void parse_time(void) {
 /* ------------- */
 /*  U0 commands  */
 /* ------------- */
-static void parse_u0command(void) {
+static void parse_bcis_command(void) {
   switch (command_buffer[2] & 0x1f) {
   case 0:
   case 0x10: /* Burst Read Sector(s) ($8371)
@@ -1812,23 +1812,23 @@ static void parse_u0command(void) {
     B - BUFFER TRANSFER ONLY (1=BUFFER TRANSFER ONLY)
     S - SIDE SELECT (MFM ONLY)
     N - DRIVE NUMBER */
-  /* We only get here if N (drive#) = 0
-    Ignore T (no transfer) until buffer open ('#0') is fixed
-    Ignore B (transfer only) until buffer open ('#0') is fixed
-    Ignore E ... FIXME
-    Ignore S until MFM disk images supported ... FIXME .D81 ??
-    Ignore 06 (next track) because we do not have a head to move
-  */
-  if (command_length < 6) {
-    /* FIXME ? 1571 doesn't check, we do */
-    b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
-      set_error(ERROR_SYNTAX_UNABLE);
-  } else {
-    fl_track = command_buffer[3];
-    fl_sector = command_buffer[4];
-    s_out_burstload(command_buffer[5]);
-  }
-      break;
+    /* We only get here if N (drive#) = 0
+      Ignore T (no transfer) until buffer open ('#0') is fixed
+      Ignore B (transfer only) until buffer open ('#0') is fixed
+      Ignore E ... FIXME
+      Ignore S until MFM disk images supported ... FIXME .D81 ??
+      Ignore 06 (next track) because we do not have a head to move
+    */
+    if (command_length < 6) {
+      /* FIXME ? 1571 doesn't check, we do */
+      b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
+        set_error(ERROR_SYNTAX_UNABLE);
+    } else {
+      fl_track = command_buffer[3];
+      fl_sector = command_buffer[4];
+      s_out_burstload(command_buffer[5]);
+    }
+    break;
   case 0x2:
   case 0x12: /* Burst Write Sector(s) ($83EC)
      02 T E B S 0 0 1   N
@@ -1841,16 +1841,16 @@ static void parse_u0command(void) {
     B - BUFFER TRANSFER ONLY (1=BUFFER TRANSFER ONLY)
     S - SIDE SELECT (MFM ONLY)
     N - DRIVE NUMBER */
-  if (command_length < 6) {
-    /* FIXME ? 1571 doesn't check, we do */
-    b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
+    if (command_length < 6) {
+      /* FIXME ? 1571 doesn't check, we do */
+      b_out_burstload(0, (bcis_status & 0xf0) | 0xe); /* syntax error */
       set_error(ERROR_SYNTAX_UNABLE);
-  } else {
-    fl_track = command_buffer[3];
-    fl_sector = command_buffer[4];
-    s_in_burstload(command_buffer[5]);
-  }
-  break;
+    } else {
+      fl_track = command_buffer[3];
+      fl_sector = command_buffer[4];
+      s_in_burstload(command_buffer[5]);
+    }
+    break;
   case 0x4:
   case 0x14: /* Burst Inquire Disk ($848B)
      02 X X X S 0 1 0   N
@@ -1860,19 +1860,19 @@ static void parse_u0command(void) {
     switch (partition[current_part].imagetype & D64_TYPE_MASK) {
     /* this assumes a readable card is in the device! */
     /* FIXME: 512 sectors for FAT and D81 */
-  case D64_TYPE_D41:
-  case D64_TYPE_D71:
+    case D64_TYPE_D41:
+    case D64_TYPE_D71:
       bcis_status = 0x01; /* okay, native CBM disk (implied sector size 256) */
-    break;
-  case D64_TYPE_D81:      /* FIXME */
+      break;
+    case D64_TYPE_D81:      /* FIXME */
       bcis_status = 0x2F; /* error, native CBM disk + 512 sector size */
-    break;
-  case D64_TYPE_NONE:     /* FAT - FIXME */
+      break;
+    case D64_TYPE_NONE:     /* FAT - FIXME */
       bcis_status = 0xAF; /* error, foreign disk + 512 sector size */
-    break;
-  default:                /* DNP, M2I ... FIXME */
-      bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
-  }
+      break;
+    default:                /* DNP, M2I ... FIXME */
+        bcis_status = 0x9F; /* error, foreign disk + 256 sector size */
+    }
     b_out_burstload(0, bcis_status); /* send status only */
     break;
   case 0x6:
@@ -1906,15 +1906,15 @@ static void parse_u0command(void) {
     W - WRITE SWITCH
     N - DRIVE NUMBER
     X - DON'T CARE */
-  /* 'W' actualy means Read (not Write) ... silly CBM */
-  if (command_buffer[2] & 0x80) 
-        b_out_burstload(0, bcis_interleave); /* read value */
-  else { /* write sector interleave */
-    if (command_length < 4)
-          set_error(ERROR_SYNTAX_UNABLE);
-    else
-      bcis_interleave = command_buffer[3]; /* no value test! ($8511) */
-  }
+    /* 'W' actualy means Read (not Write) ... silly CBM */
+    if (command_buffer[2] & 0x80) 
+      b_out_burstload(0, bcis_interleave); /* read value */
+    else { /* write sector interleave */
+      if (command_length < 4)
+        set_error(ERROR_SYNTAX_UNABLE);
+      else
+        bcis_interleave = command_buffer[3]; /* no value test! ($8511) */
+    }
       break;
   case 0xa:
   case 0x1a: {/* Query Disk Format ($8517)
@@ -2172,7 +2172,7 @@ static void parse_user(void) {
   case '0':
     /* U0 Commands -- FIXME a seperate parser ?
       all parameters quoted from 1571 source code "Fastutl.src" */
-    parse_u0command();
+    parse_bcis_command();
     /*
     if ((command_buffer[2] & 0x1f) == 0x1e &&
         command_buffer[3] >= 4 &&
