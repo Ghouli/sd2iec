@@ -310,6 +310,8 @@ date_t date_match_start;
 date_t date_match_end;
 
 uint16_t datacrc = 0xffff;
+uint8_t bcis_status = 0x0f; /* drive not ready */
+uint8_t bcis_interleave = 5;
 static fastloaderid_t previous_loader;
 
 /* partial fastloader data capture */
@@ -2099,7 +2101,7 @@ case 0x0e: /* Duplicate Disk ($85a5) */
           set_error(ERROR_SYNTAX_UNKNOWN);
       break; /* fall through */
   }
-  break; /* End U0 Command */
+  /* End U0 Command */
 }
 
 /* ------------ */
@@ -2170,7 +2172,7 @@ static void parse_user(void) {
   case '0':
     /* U0 Commands -- FIXME a seperate parser ?
       all parameters quoted from 1571 source code "Fastutl.src" */
-    parse_u0command()
+    parse_u0command();
     /*
     if ((command_buffer[2] & 0x1f) == 0x1e &&
         command_buffer[3] >= 4 &&
@@ -2180,7 +2182,7 @@ static void parse_user(void) {
       break;
     }*/
     /* Fall through */
-
+    break;
   default:
     set_error(ERROR_SYNTAX_UNKNOWN);
     break;

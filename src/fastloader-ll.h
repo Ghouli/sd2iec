@@ -72,6 +72,9 @@ uint8_t parallel_read(void);
 void parallel_write(uint8_t value);
 void parallel_send_handshake(void);
 
+uint8_t fserial_out(uint8_t fast_flags, uint8_t value);
+int16_t fserial_in(uint8_t fast_flags);
+
 #ifdef HAVE_PARALLEL
 void parallel_set_dir(parallel_dir_t direction);
 #else

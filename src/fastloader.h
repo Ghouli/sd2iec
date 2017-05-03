@@ -61,7 +61,8 @@ typedef enum {
   FL_ELOAD1,
   FL_FC3_OLDFREEZED,
   FL_MMZAK,
-  FL_N0SDOS_FILEREAD
+  FL_N0SDOS_FILEREAD,
+  FL_BURSTLOAD
 } fastloaderid_t;
 
 extern fastloaderid_t detected_loader;
@@ -96,6 +97,13 @@ int16_t dolphin_getc(void);
 uint8_t dolphin_putc(uint8_t data, uint8_t with_eoi);
 void load_dolphin(void);
 void save_dolphin(void);
+
+/* burst loader functions */
+uint8_t b_out_burstload(uint8_t flags, uint8_t val);
+int16_t b_in_burstload(uint8_t flags);
+void s_out_burstload(uint8_t n_sec);
+void s_in_burstload(uint8_t n_sec);
+void f_out_burstload(void);
 
 /* functions that are shared between multiple loaders */
 /* currently located in fastloader.c                  */

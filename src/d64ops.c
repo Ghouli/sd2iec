@@ -193,7 +193,7 @@ static uint32_t sector_offset(uint8_t part, uint8_t track, const uint8_t sector)
  * This function returns the number of sectors on the given track
  * of a 1541/71/81 disk. Invalid track numbers will return invalid results.
  */
-static uint16_t sectors_per_track(uint8_t part, uint8_t track) {
+uint16_t sectors_per_track(uint8_t part, uint8_t track) {
   switch (partition[part].imagetype & D64_TYPE_MASK) {
   case D64_TYPE_D41:
   case D64_TYPE_D71:

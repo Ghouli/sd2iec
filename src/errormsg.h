@@ -58,6 +58,7 @@ uint8_t set_ok_message(buffer_t *buf);
 #define ERROR_SYNTAX_JOKER       33
 #define ERROR_SYNTAX_NONAME      34
 #define ERROR_FILE_NOT_FOUND_39  39
+#define ERROR_BUS                40
 #define ERROR_RECORD_MISSING     50
 #define ERROR_RECORD_OVERFLOW    51
 #define ERROR_FILE_TOO_LARGE     52

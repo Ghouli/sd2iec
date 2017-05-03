@@ -433,6 +433,155 @@ js_finish:
         ret
 
 
+        ;; ====================================================================
+        ;;  Fast Serial
+        ;; ====================================================================
+    .global fserial_out
+fserial_out:
+        ;;
+        ;; Sends a single byte over the fast serial bus (SRQ and DATA)
+        ;; uint8_t fast_flags (r24), uint8_t value (r22)
+        ;; return uint8_t atnactive (r24)
+        ;;
+        ;; fast_flags.0 is the 'ready' signal we want to see on CLOCK
+        ;; fast_flags.1 is flag to send without checking (debug)
+        ;;
+
+    com r22     ; invert value
+
+    ;; check flag to ignore CLOCK * debug *
+    mov r23, r24    ; save fast_flags
+    andi    r24, 2      ; ignore CLOCK ?
+    brne    1f      ; yes
+
+    ;; setup wait condition
+    ldi r19, IEC_BIT_CLOCK | IEC_BIT_ATN
+    mov r24, r23    ; get fast_flags
+    andi    r24, 1      ; want CLOCK active / low ?
+    breq    0f              ; yes
+    ldi r24, IEC_BIT_CLOCK
+    eor r19, r24        ; want CLOCK released / high
+0:
+    ;; wait for desired CLOCK or ATN active
+    in  r24, _SFR_IO_ADDR(IEC_INPUT)
+    andi    r24, IEC_BIT_CLOCK | IEC_BIT_ATN
+    cp  r24, r19
+    breq    0b
+
+    ;; check for ATN
+    andi    r24, IEC_BIT_ATN
+    breq    5f
+1:
+    ;; setup output loop
+    ldi r25, 8      ; 8 bits to send
+    in  r19, _SFR_IO_ADDR(IEC_OUTPUT)
+    andi    r19, ~(IEC_OBIT_DATA|IEC_OBIT_CLOCK|IEC_OBIT_ATN)
+    rjmp    3f      ; send byte
+
+    ;; Each bit is 7us = 3us of notice/delay + 4us data hold.
+    ;; The CIA is symetrical = send same data and same delay
+    ;; but because we send faster than CIA of 128/1571/1581,
+    ;; we keep the data a little bit longer.
+    ;; The CIA receiving data does not care much about delay,
+    ;; the speed is limited by capacitance/inducance/resistance
+    ;; of the physical serial cable(s) connected to the system.
+2:
+    ;; loop to send
+    lsl r22     ; 1 - next bit
+    delay_cycles 24     ; 24 = 32 - 8
+3:
+    ori r19, IEC_OBIT_SRQ ; 1 - activate SRQ
+    bst r22, 7      ; 1 - get bit to send
+    bld r19, IEC_OPIN_DATA ; 1 - put it on DATA line
+    out _SFR_IO_ADDR(IEC_OUTPUT), r19 ; 1 - output on serial bus
+
+    delay_cycles 22     ; 22 = 24 - 2
+    andi    r19, ~IEC_OBIT_SRQ ; 1 - release SRQ
+    out _SFR_IO_ADDR(IEC_OUTPUT), r19 ; 1 - output on serial bus
+    dec r25     ; 1 - count bits
+    brne    2b      ; 2 - next bit
+
+    ;; hold last bit
+    delay_cycles 27     ; 27 = 32 - 5
+4:
+    ;; test ATN and release DATA
+    in  r24, _SFR_IO_ADDR(IEC_INPUT) ; 1
+    andi    r19, ~IEC_OBIT_DATA        ; 1
+    out _SFR_IO_ADDR(IEC_OUTPUT), r19 ; 1
+5:
+    ;; exit
+        com     r24             ; invert port state (ATN low returns true)
+        andi    r24, IEC_BIT_ATN ; single out ATN bit
+    ret
+
+    .global fserial_in
+fserial_in:
+        ;;
+        ;; Receive a single byte over the fast serial bus (SRQ and DATA)
+        ;; uint8_t fast_flags (r24)
+        ;; return int16_t data or -1 if ATN active
+        ;;
+        ;; fast_flags.0 is ~CLOCK to send (if no toggle)
+        ;; fast_flags.1 is flag to toggle CLOCK
+        ;;
+
+    ;; setup for output
+    in  r19, _SFR_IO_ADDR(IEC_OUTPUT)
+    andi    r19, ~(IEC_OBIT_DATA|IEC_OBIT_SRQ|IEC_OBIT_ATN)
+
+    ;; check flag to toggle CLOCK
+    sbrs    r24, 1      ; test fast_flags
+    rjmp    0f              ; set specific value
+    ldi r21, IEC_OBIT_CLOCK
+    eor r19, r21    ; toggle CLOCK
+    rjmp    1f
+
+0:  ;; set specific CLOCK
+    bst r24, 0      ; get ~CLOCK from fast_flags
+    bld r19, IEC_OPIN_CLOCK ; set for output
+
+1:  ;; check ATN and setup loop condition
+    in  r20, _SFR_IO_ADDR(IEC_INPUT)
+    andi    r20, IEC_BIT_ATN
+    breq    3f
+    out _SFR_IO_ADDR(IEC_OUTPUT), r19 ; set output, ready for input
+    clr r25     ; clear return high
+    ldi r21, 8      ; bit counter
+
+0:  ;; loop for bits
+    lsl r24
+
+1:  ;; wait for SRQ or ATN to go low
+    in  r20, _SFR_IO_ADDR(IEC_INPUT)
+    sbrs    r20, IEC_PIN_ATN
+    rjmp    3f
+    sbrc    r20, IEC_PIN_SRQ
+    rjmp    1b
+
+2:  ;; capture DATA on rising edge of SRQ
+    in  r20, _SFR_IO_ADDR(IEC_INPUT)
+    sbrs    r20, IEC_PIN_ATN
+    rjmp    3f
+    sbrs    r20, IEC_PIN_SRQ
+    rjmp    2b
+
+    ;; save bit and test loop
+    bst r20, IEC_PIN_DATA
+    bld r24, 0
+    dec r21
+    brne    0b
+
+    ;; set return value
+;;  com r24     ; invert bits received
+    ret
+
+3:  ;; ATN active
+    ldi r25,0xff    ; negative return value
+    andi    r19, ~IEC_OBIT_CLOCK ; release CLOCK
+    ori r19, IEC_OBIT_DATA   ; emulate ATN acknowledge
+    out _SFR_IO_ADDR(IEC_OUTPUT), r19
+    ret
+
 #ifdef CONFIG_LOADER_TURBODISK
         ;; ====================================================================
         ;;  Turbodisk
