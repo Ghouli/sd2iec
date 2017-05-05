@@ -139,6 +139,12 @@ void uart_putcrlf(void) {
   uart_putc(10);
 }
 
+void uart_put_str(char *str) {
+  while(*str) {
+    uart_putc(*str++);
+  }
+}
+
 static FILE mystdout = FDEV_SETUP_STREAM(ioputc, NULL, _FDEV_SETUP_WRITE);
 
 void uart_init(void) {

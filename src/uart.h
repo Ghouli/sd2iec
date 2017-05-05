@@ -38,6 +38,7 @@ void uart_trace(void *ptr, uint16_t start, uint16_t len);
 void uart_flush(void);
 void uart_puts_P(const char *text);
 void uart_putcrlf(void);
+void uart_put_str(char *str);
 
 #ifdef __AVR__
 #  define printf(str,...) printf_P(PSTR(str), ##__VA_ARGS__)
@@ -53,6 +54,7 @@ void uart_putcrlf(void);
 #define uart_puts_P(x) do {} while(0)
 #define uart_putcrlf() do {} while(0)
 #define uart_trace(a,b,c) do {} while(0)
+#define uart_put_str() do {} while(0)
 
 #endif
 
