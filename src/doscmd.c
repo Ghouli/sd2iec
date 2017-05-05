@@ -1799,6 +1799,9 @@ static void parse_time(void) {
 /*  U0 commands  */
 /* ------------- */
 static void parse_bcis_command(void) {
+  uart_put_str("U0: ");
+  uart_puthex(command_buffer[2]);
+  uart_putcrlf();
   switch (command_buffer[2] & 0x1f) {
   /* CMD 1 - READ */
   case 0:

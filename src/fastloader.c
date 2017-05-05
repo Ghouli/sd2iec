@@ -127,6 +127,7 @@ int16_t gijoe_read_byte(void) {
 /* Burst loader functions */
 /* -- move these later ---*/
 uint8_t b_out_burstload(uint8_t flags, uint8_t val) {
+  uart_put_str("b_out\n\r");
   ATOMIC_BLOCK( ATOMIC_FORCEON ) {
     val = fserial_out(flags, val);
   }
@@ -134,6 +135,7 @@ uint8_t b_out_burstload(uint8_t flags, uint8_t val) {
 }
 
 int16_t b_in_burstload(uint8_t flags) {
+  uart_put_str("b_in\n\r");
   int16_t val;
   ATOMIC_BLOCK( ATOMIC_FORCEON ) {
     val = fserial_in(flags);
@@ -142,6 +144,7 @@ int16_t b_in_burstload(uint8_t flags) {
 }
 
 void s_out_burstload(uint8_t n_sec) {
+  uart_put_str("s_out\n\r");
   /* send status byte and sector(s) of data from fl_track $8371 */
   /* command_buffer[2] contains special flags */
   /* fl_sector is the first sector, n_sec is the number of sectors */
@@ -252,6 +255,7 @@ void s_out_burstload(uint8_t n_sec) {
 }
 
 void s_in_burstload(uint8_t n_sec) {
+  uart_put_str("s_in\n\r");
   /* get sector(s) of data & write to fl_track $83EC */
   /* command_buffer[2] contains special flags */
   /* fl_sector is the first sector, n_sec is the number of sectors */
@@ -384,6 +388,7 @@ void s_in_burstload(uint8_t n_sec) {
 }
 
 void f_out_burstload(void) {
+  uart_put_str("f_out\n\r");
   /* send a complete file using fast serial bus  */
   uint8_t flags;
   uint8_t stop = 0; /* ok, not found ATN */
@@ -444,7 +449,7 @@ void f_out_burstload(void) {
     if (bcis_status == 0x1f) {
       /* last block ($914e) or 1-block file ($9159) */
       
-      /*if (fserial_out(flags ^= 1, flags & 0x80 ? len-2 : len)) <- hope this meant that we want to change flag state before doing compare */
+      /*if (fserial_out(flags ^= 1, flags & 0x80 ? len-2 : len)) <- gcc disapproves */
       flags ^= 1;
       if (fserial_out(flags, flags & 0x80 ? len-2 : len))
         break; /* found ATN */
