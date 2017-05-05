@@ -179,6 +179,9 @@ static uint8_t *appendbool(uint8_t *msg, uint8_t ch, uint8_t value) {
 }
 
 void set_error(uint8_t errornum) {
+  uart_put_str("set_error ");
+  uart_puthex(errornum);
+  uart_putcrlf();
   set_error_ts(errornum,0,0);
 }
 
