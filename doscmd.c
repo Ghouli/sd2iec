@@ -103,10 +103,10 @@ void __cyg_profile_func_enter (void *this_fn, void *call_site) {
 
 #if CONFIG_RTC_VARIANT > 0
 /* Days of the week as used by the CMD FD */
-static PROGMEM uint8_t downames[] = "SUN.MON.TUESWED.THURFRI.SAT.";
+static const PROGMEM uint8_t downames[] = "SUN.MON.TUESWED.THURFRI.SAT.";
 
 /* Skeleton of the ASCII time format */
-static PROGMEM uint8_t asciitime_skel[] = " xx/xx/xx xx:xx:xx xM\r";
+static const PROGMEM uint8_t asciitime_skel[] = " xx/xx/xx xx:xx:xx xM\r";
 #endif
 
 /* ------------------------------------------------------------------------- */

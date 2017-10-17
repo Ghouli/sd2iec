@@ -7,7 +7,7 @@ PATCHLEVEL = 2
 FIX =
 
 # Forces bootloader version to 0, comment out for release
-#PRERELEASE =
+PRERELEASE = 91
 
 #----------------------------------------------------------------------------
 # WinAVR Makefile Template written by Eric B. Weddington, Joerg Wunsch, et al.
@@ -227,7 +227,9 @@ NM = avr-nm
 AVRDUDE = avrdude
 REMOVE = rm -f
 COPY = cp
-WINSHELL = cmd
+# Win 95/98/ME use command.com while NT4/2K/XP use cmd.exe
+#WINSHELL = cmd
+WINSHELL = cmand98
 
 
 #---------------- Compiler Options ----------------
@@ -241,7 +243,8 @@ CFLAGS = -g$(DEBUG)
 CFLAGS += $(CDEFS) $(CINCS)
 CFLAGS += -O$(OPT)
 CFLAGS += -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
-CFLAGS += -Wall -Wstrict-prototypes -Werror
+#CFLAGS += -Wall -Wstrict-prototypes -Werror
+CFLAGS += -Wall -Wstrict-prototypes
 #CFLAGS += -Wa,-adhlns=$(OBJDIR)/$(<:.c=.lst)
 CFLAGS += -I$(OBJDIR)
 CFLAGS += $(patsubst %,-I%,$(EXTRAINCDIRS))
@@ -252,10 +255,11 @@ CFLAGS += -ffunction-sections -fdata-sections
 # these are needed for GCC 4.3.2, which is more aggressive at inlining
 # gcc-4.2 knows one of those, but it tends to increase code size
 ifeq ($(shell $(CC) --version|gawk -f gcctest.awk),YES)
-CFLAGS += --param inline-call-cost=3
+#CFLAGS += --param inline-call-cost=3
 CFLAGS += -fno-inline-small-functions
 CFLAGS += -fno-move-loop-invariants
 CFLAGS += -fno-split-wide-types
+CFLAGS += -Wno-deprecated-declarations -D__PROG_TYPES_COMPAT__
 
 # turn these on to keep the functions in the same order as in the source
 # this is only useful if you're looking at disassembly
@@ -408,8 +412,8 @@ DEBUG_MFREQ = $(CONFIG_MCU_FREQ)
 DEBUG_UI = insight
 
 # Set the debugging back-end to either avarice, simulavr.
-DEBUG_BACKEND = avarice
-#DEBUG_BACKEND = simulavr
+#DEBUG_BACKEND = avarice
+DEBUG_BACKEND = simulavr
 
 # GDB Init Filename.
 GDBINIT_FILE = __avr_gdbinit
@@ -454,7 +458,7 @@ ALL_ASFLAGS = -mmcu=$(MCU) -I. -x assembler-with-cpp $(ASFLAGS) $(CDEFS)
 
 
 # Default target.
-all: build
+all: build lss
 
 build: elf bin hex
 	$(E) "  SIZE   $(TARGET).elf"
@@ -519,8 +523,8 @@ ifeq ($(DEBUG_BACKEND), avarice)
 	@$(WINSHELL) /c pause
 
 else
-	@$(WINSHELL) /c start simulavr --gdbserver --device $(MCU) --clock-freq \
-	$(DEBUG_MFREQ) --port $(DEBUG_PORT)
+	@$(WINSHELL) /c simulavr --gdbserver --device atmega128 --cpufrequency \
+	$(DEBUG_MFREQ) -p $(DEBUG_PORT) -f $(TARGET).elf
 endif
 	@$(WINSHELL) /c start avr-$(DEBUG_UI) --command=$(GDBINIT_FILE)
 
