@@ -37,9 +37,20 @@
 #define DIR_OFS_SIZE_LOW        0x1e
 #define DIR_OFS_SIZE_HI         0x1f
 
+/* partition[].imagetype */
+#define D64_TYPE_MASK 3
+#define D64_TYPE_NONE 0
+#define D64_TYPE_D41  1
+#define D64_TYPE_D71  2
+#define D64_TYPE_D81  3
+#define D64_TYPE_DNP  4
+#define D64_HAS_ERRORINFO 128
+
 extern const fileops_t d64ops;
 
 extern buffer_t *bam_buffer;
+
+uint8_t sectors_per_track(uint8_t part, uint8_t track);
 
 uint8_t d64_mount(uint8_t part);
 

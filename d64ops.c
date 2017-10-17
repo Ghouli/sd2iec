@@ -60,15 +60,6 @@
 /* No errorinfo support for D81 */
 #define MAX_SECTORS_PER_TRACK 21
 
-#define D64_TYPE_MASK 3
-#define D64_TYPE_NONE 0
-#define D64_TYPE_D41  1
-#define D64_TYPE_D71  2
-#define D64_TYPE_D81  3
-#define D64_TYPE_DNP  4
-
-#define D64_HAS_ERRORINFO 128
-
 typedef enum { BAM_BITFIELD, BAM_FREECOUNT } bamdata_t;
 
 struct {
@@ -162,7 +153,7 @@ static uint32_t sector_offset(uint8_t part, uint8_t track, const uint8_t sector)
  * This function returns the number of sectors on the given track
  * of a 1541/71/81 disk. Invalid track numbers will return invalid results.
  */
-static uint8_t sectors_per_track(uint8_t part, uint8_t track) {
+uint8_t sectors_per_track(uint8_t part, uint8_t track) {
   switch (partition[part].imagetype & D64_TYPE_MASK) {
   case D64_TYPE_D41:
   case D64_TYPE_D71:

@@ -80,6 +80,8 @@ static const prog_uint8_t messages[] = {
     'S','Y','N','T','A','X',3,
   EC(39), EC(62),
     0,4,'F','O','U','N','D',
+  EC(40),
+    'B','U','S', 3,
   EC(50),
     7,4,'P','R','E','S','E','N','T',
   EC(51),

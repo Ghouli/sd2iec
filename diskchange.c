@@ -83,6 +83,7 @@ static uint8_t mount_line(void) {
 
   uint8_t olderror = current_error;
   current_error = ERROR_OK;
+  bcis_status = 0xb; /* disk change */
 
   /* Kill all buffers */
   free_multiple_buffers(FMB_USER_CLEAN);

@@ -1,5 +1,7 @@
 /* sd2iec - SD/MMC to Commodore serial bus interface/controller
    Copyright (C) 2007-2009  Ingo Korb <ingo@akana.de>
+   Fast Serial protocol and Burst Command Instruction Set:
+   Copyright (C) 2011  Robert Willie <hydradix@yahoo.com>
 
    Inspiration and low-level SD/MMC access based on code from MMC2IEC
      by Lars Pontoppidan et al., see sdcard.c|h and config.h.
@@ -35,6 +37,7 @@
 #define FL_DREAMLOAD_OLD 5
 #define FL_FC3_FREEZED   6
 #define FL_ULOAD3        7
+#define FL_BURSTLOAD     8
 
 #ifndef __ASSEMBLER__
 
@@ -47,6 +50,11 @@ void load_fc3(uint8_t freezed);
 void save_fc3(void);
 void load_dreamload(void);
 void load_uload3(void);
+uint8_t b_out_burstload(uint8_t flags, uint8_t val);
+int16_t b_in_burstload(uint8_t flags);
+void s_out_burstload(uint8_t n_sec);
+void s_in_burstload(uint8_t n_sec);
+void f_out_burstload(void);
 
 #endif
 #endif

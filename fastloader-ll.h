@@ -1,5 +1,7 @@
 /* sd2iec - SD/MMC to Commodore serial bus interface/controller
    Copyright (C) 2007-2009  Ingo Korb <ingo@akana.de>
+   Fast Serial protocol and Burst Command Instruction Set:
+   Copyright (C) 2011  Robert Willie <hydradix@yahoo.com>
 
    Inspiration and low-level SD/MMC access based on code from MMC2IEC
      by Lars Pontoppidan et al., see sdcard.c|h and config.h.
@@ -42,5 +44,8 @@ void dreamload_send_byte(uint8_t byte);
 
 int16_t uload3_get_byte(void);
 void uload3_send_byte(uint8_t byte);
+
+uint8_t fserial_out(uint8_t fast_flags, uint8_t value);
+int16_t fserial_in(uint8_t fast_flags);
 
 #endif

@@ -1009,6 +1009,7 @@ uint8_t fat_chdir(path_t *path, uint8_t *dirname) {
           return 1;
         partition[path->part].fop = &d64ops;
       }
+	  bcis_status = 0xb; /* disk change */
 
       partition[path->part].current_dir = partition[path->part].fatfs.curr_dir;
 
@@ -1370,6 +1371,8 @@ uint8_t image_unmount(uint8_t part) {
       }
     }
   }
+  partition[part].imagetype = D64_TYPE_NONE;
+  bcis_status = 0xb; /* disk change */
 
   if (display_found) {
     /* Send current path to display */

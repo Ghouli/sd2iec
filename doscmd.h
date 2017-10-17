@@ -1,5 +1,7 @@
 /* sd2iec - SD/MMC to Commodore serial bus interface/controller
    Copyright (C) 2007-2009  Ingo Korb <ingo@akana.de>
+   Fast Serial protocol and Burst Command Instruction Set:
+   Copyright (C) 2011  Robert Willie <hydradix@yahoo.com>
 
    Inspiration and low-level SD/MMC access based on code from MMC2IEC
      by Lars Pontoppidan et al., see sdcard.c|h and config.h.
@@ -33,6 +35,8 @@ extern date_t date_match_start;
 extern date_t date_match_end;
 
 extern uint16_t datacrc;
+extern uint8_t bcis_status;
+extern uint8_t bcis_interleave;
 
 void parse_doscommand(void);
 
